@@ -49,255 +49,75 @@ class chip8{
     unsigned short I,pc,sp,opcode;
     unsigned short stack[CHIP8_STACK_SIZE];
 
-    int handle0(opcode_params_t opcodeParams)
+    void draw(opcode_params_t opcodeParams)
     {
-      switch(opcodeParams.kk)
+      unsigned short row;
+      V[0xF] = 0;
+      for(int yline = 0; yline < opcodeParams.l; yline++)
       {
-        case 0x00E0:
-          for(int i = 0; i < CHIP8_GFX_WIDTH*CHIP8_GFX_HEIGHT; i++) gfx[i] = 0;
-          pc += 2;
-        break;
-
-        case 0x00EE:
-          pc = stack[sp];
-          --sp;
-          pc += 2;
-        break;
+        row = memory[I + yline];
+        for(int xline = 0; xline < 8; xline++)
+        {
+          if((row & (0x80 >> xline)) != 0)
+          {
+            if(gfx[(V[opcodeParams.x] + xline + ((V[opcodeParams.y] + yline) * CHIP8_GFX_WIDTH))] == 1) V[0xF] = 1;
+            gfx[V[opcodeParams.x] + xline + ((V[opcodeParams.y] + yline) * CHIP8_GFX_WIDTH)] ^= 1;
+          }
+        }
       }
-      return 0;
-    }
-
-    int handle8(opcode_params_t opcodeParams)
-    {
-      switch(opcodeParams.l)
-      {
-        case 0x0000:
-          V[opcodeParams.x] = V[opcodeParams.y];
-          pc += 2;
-        break;
-        
-        case 0x0001:
-          V[opcodeParams.x] = V[opcodeParams.x] | V[opcodeParams.y];
-          pc += 2;
-        break;
-        
-        case 0x0002:
-          V[opcodeParams.x] = V[opcodeParams.x] & V[opcodeParams.y];
-          pc += 2;
-        break;
-        
-        case 0x0003:
-          V[opcodeParams.x] = V[opcodeParams.x] ^ V[opcodeParams.y];
-          pc += 2;
-        break;
-        
-        case 0x0004:
-          if(V[opcodeParams.y] > (0xFF - V[opcodeParams.x])) V[0xF] = 1; else V[0xF] = 0;
-          V[opcodeParams.x] += V[opcodeParams.y];
-          pc += 2;
-        break;
-        
-        case 0x0005:
-          if(V[opcodeParams.y] > V[opcodeParams.x]) V[0xF] = 0; else V[0xF] = 1;
-          V[opcodeParams.x] -= V[opcodeParams.y];
-          pc += 2;
-        break;
-        
-        case 0x0006:
-          if(V[opcodeParams.x] & 0x0001) V[0xF] = 1; else V[0xF] = 0;
-          V[opcodeParams.x] / 2;
-          pc += 2;
-        break;
-        
-        case 0x0007:
-          if(V[opcodeParams.y] > V[opcodeParams.x]) V[0xF] = 1; else V[0xF] = 0;
-          V[opcodeParams.x] = V[opcodeParams.y] - V[opcodeParams.x];
-          pc += 2;
-        break;
-        
-        case 0x000E:
-          if((V[opcodeParams.x] & 0x8000) == 0x8000) V[0xF] = 1; else V[0xF] = 0;
-          V[opcodeParams.x] * 2;
-          pc += 2;
-        break;
-      }
-      return 0;
-    }
-
-    int handleE(opcode_params_t opcodeParams)
-    {
-      switch(opcodeParams.kk)
-      {
-        case 0x009E:
-          if(key[V[opcodeParams.x]]) pc += 2;
-          pc += 2;
-        break;
-
-        case 0x00A1:
-          if(key[V[opcodeParams.x]] == 0) pc += 2;
-          pc += 2;
-        break;
-      }  
-      return 0;
-    }
-
-    int handleF(opcode_params_t opcodeParams)
-    {
-      bool loop = true;
-      switch(opcodeParams.kk)
-      {
-        case 0x0007:
-          V[opcodeParams.x] = delay_timer;
-          pc += 2;
-        break;
-        
-        case 0x000A:
-          for(int i = 0; i < CHIP8_KEY_COUNT; i++) if(key[i]) pc += 2; 
-        break;
-        
-        case 0x0015:
-          delay_timer = V[opcodeParams.x];
-          pc += 2;
-        break;
-        
-        case 0x0018:
-          sound_timer = V[opcodeParams.x];
-          pc += 2;
-        break;
-        
-        case 0x001E:
-          I += V[opcodeParams.x];
-          pc += 2;
-        break;
-        
-        case 0x0029:
-          I = 5*V[opcodeParams.x];
-          pc += 2;
-        break;
-        
-        case 0x0033:
-          memory[I]     = V[opcodeParams.x] / 100;
-          memory[I + 1] = (V[opcodeParams.x] / 10) % 10;
-          memory[I + 2] = (V[opcodeParams.x] % 100) % 10;
-          pc += 2;
-        break;
-        
-        case 0x0055:
-          for(int i = 0; i < V[opcodeParams.x]; i++) memory[I+i] = V[i];
-          pc += 2;
-        break;
-        
-        case 0x0065:
-          for(int i = 0; i < V[opcodeParams.x]; i++) V[i] = memory[I+i];
-          pc += 2;
-        break;
-      }
-      return 0;
     }
 
     int handleOpcode(unsigned short a_opcode)
     {
-      opcode_params_t opcodeParams;
-      
-      opcodeParams.p      = opcode & 0xF000;
-      opcodeParams.x      = (opcode & 0x0F00) >> 8;
-      opcodeParams.y      = (opcode & 0x00F0) >> 4;
-      opcodeParams.kk     = opcode & 0x00FF;
-      opcodeParams.nnn    = opcode & 0x0FFF;
-      opcodeParams.l      = opcode & 0x000F;
+      opcode_params_t op;
 
-      switch(opcodeParams.p)
-      {
-        case 0x0000:
-          handle0(opcodeParams);
-        break;
+      op.p   = (opcode & 0xF000) >> 12;
+      op.x   = (opcode & 0x0F00) >> 8;
+      op.y   = (opcode & 0x00F0) >> 4;
+      op.kk  = opcode & 0x00FF;
+      op.nnn = opcode & 0x0FFF;
+      op.l   = opcode & 0x000F;
 
-        case 0x1000:
-          pc = opcodeParams.nnn;
-        break;
-        
-        case 0x2000:
-          ++sp;
-          stack[sp] = pc;
-          pc = opcodeParams.nnn;
-        break;
-        
-        case 0x3000:
-          if(V[opcodeParams.x] == opcodeParams.kk) pc += 2;
-          pc += 2;
-        break;
-        
-        case 0x4000:
-          if(V[opcodeParams.x] != opcodeParams.kk) pc += 2;
-          pc += 2;
-        break;
-        
-        case 0x5000:
-          if(V[opcodeParams.x] == V[opcodeParams.y]) pc += 2;
-          pc += 2;
-        break;
+      #define t(test,ops) if(test) { ops; }
+      t(op.p==0x0 && op.nnn==0xE0, for(int i = 0; i < CHIP8_GFX_WIDTH*CHIP8_GFX_HEIGHT; i++) gfx[i] = 0);
+      t(op.p==0x0 && op.nnn==0xEE, pc=stack[sp--]                                                      );
+      t(op.p==0x1                , pc= op.nnn                                                          );
+      t(op.p==0x2                , stack[++sp] = pc; pc = op.nnn                                       );
+      t(op.p==0x3                , if(op.kk == V[op.x])   pc += 2                                      );
+      t(op.p==0x4                , if(op.kk != V[op.x])   pc += 2                                      );
+      t(op.p==0x5 && op.l==0x0   , if(V[op.y] == V[op.x]) pc += 2                                      );
+      t(op.p==0x6                , V[op.x] =  op.kk                                                    );
+      t(op.p==0x7                , V[op.x] += op.kk                                                    );
+      t(op.p==0x8 && op.l==0x1   , V[op.x] |= V[op.y]                                                  );
+      t(op.p==0x8 && op.l==0x2   , V[op.x] &= V[op.y]                                                  );
+      t(op.p==0x8 && op.l==0x3   , V[op.x] ^= V[op.y]                                                  );
+      t(op.p==0x8 && op.l==0x4   , if(V[op.y] > (0xFF - V[op.x])) V[0xF] = 1;
+                                     else V[0xF] = 0; V[op.x] += V[op.y]                               );
+      t(op.p==0x8 && op.l==0x5   , if(V[op.y] > V[op.x]) V[0xF] = 0; else V[0xF] = 1;V[op.x] -= V[op.y]);
+      t(op.p==0x8 && op.l==0x6   , V[0xF] = V[op.y]  & 1;  V[op.x] = V[op.y] >> 1                      );
+      t(op.p==0x8 && op.l==0x7   , op.l = V[op.y]-V[op.x]; V[0xF] = !(op.l>>8); V[op.x] = op.l         );
+      t(op.p==0x8 && op.l==0xE   , V[0xF] = V[op.y] >> 7;  V[op.x] = V[op.y] << 1                      );
+      t(op.p==0x8 && op.l==0x0   , V[op.x] = V[op.y]                                                   );
+      t(op.p==0x9 && op.l==0x0   , if(V[op.y] != V[op.x]) pc += 2;                                     );
+      t(op.p==0xA                , I = op.nnn                                                          );
+      t(op.p==0xB                , pc= op.nnn + V[0]                                                   );
+      t(op.p==0xC                , V[op.x] = (rand() % 256) & op.kk                                    );
+      t(op.p==0xD                , draw(op)                                                            );
+      t(op.p==0xE && op.kk==0x9E , if( key[V[op.x]] == 1) pc += 2                                      );
+      t(op.p==0xE && op.kk==0xA1 , if( key[V[op.x]] == 0) pc += 2                                      );
+      t(op.p==0xF && op.kk==0x0A , for(int i = 0; i < CHIP8_KEY_COUNT; i++)
+        if(key[i]) {pc += 2; V[op.x] = i;} else pc -= 2                                                );
+      t(op.p==0xF && op.kk==0x29 , I = 5*V[op.x];                                                      );
+      t(op.p==0xF && op.kk==0x07 , V[op.x] = delay_timer                                               );
+      t(op.p==0xF && op.kk==0x15 , delay_timer = V[op.x]                                               );
+      t(op.p==0xF && op.kk==0x18 , sound_timer = V[op.x]                                               );
+      t(op.p==0xF && op.kk==0x1E , I += V[op.x];                                                       ); //IF wont work, repair
+      t(op.p==0xF && op.kk==0x33 , memory[I    ] = (V[op.x] / 100);
+                                   memory[I + 1] = (V[op.x] / 10 )%10;
+                                   memory[I + 2] = (V[op.x] % 100)%10                                  );
+      t(op.p==0xF && op.kk==0x55 , for(int i = 0; i <= op.x; i++) memory[I++] = V[i];                  );
+      t(op.p==0xF && op.kk==0x65 , for(int i = 0; i <= op.x; i++) V[i] = memory[I++];                  );
 
-        case 0x6000:
-          V[opcodeParams.x] = opcodeParams.kk;
-          pc += 2;
-        break;
-
-        case 0x7000:
-          V[opcodeParams.x] += opcodeParams.kk;
-          pc += 2;
-        break;
-        
-        case 0x8000:
-          handle8(opcodeParams);
-        break;
-        
-        case 0x9000:
-          if(V[opcodeParams.x] != V[opcodeParams.y]) pc += 2;
-          pc += 2;
-        break;
-        
-        case 0xA000:
-          I = opcodeParams.nnn;
-          pc += 2;
-        break;
-        
-        case 0xB000:
-          pc = opcodeParams.nnn + V[0x0];
-        break;
-        
-        case 0xC000:
-          V[opcodeParams.x] = (rand() % 256) & opcodeParams.kk;
-          pc += 2;
-        break;
-        
-        case 0xD000:
-          unsigned short row;
-          V[0xF] = 0;
-          for(int yline = 0; yline < opcodeParams.l; yline++)
-          {
-            row = memory[I + yline];
-            for(int xline = 0; xline < 8; xline++)
-            {
-              if((row & (0x80 >> xline)) != 0)
-              {
-                if(gfx[(V[opcodeParams.x] + xline + ((V[opcodeParams.y] + yline) * CHIP8_GFX_WIDTH))] == 1) V[0xF] = 1;
-                gfx[V[opcodeParams.x] + xline + ((V[opcodeParams.y] + yline) * CHIP8_GFX_WIDTH)] ^= 1;
-              }
-            }
-          }
-          pc += 2;
-        break;
-        
-        case 0xE000:
-          handleE(opcodeParams);
-        break;
-        
-        case 0xF000:
-          handleF(opcodeParams);
-        break;
-      }
-
-      return 0;
     }
 
   public:
@@ -335,6 +155,7 @@ class chip8{
     void updateCycle()
     {
       opcode = memory[pc] << 8 | memory[pc+1];
+      pc += 2;
 
       printf("Opcode number: %X\n", opcode);
       
@@ -508,6 +329,11 @@ void handleEvent(SDL_Event event,chip8* chip)
 #define WINDOW_HEIGHT 768
 #define GFX_COLOR1    0x00009900
 #define GFX_COLOR2    0x6699FF00
+
+char* getFileName()
+{
+  //TODO: choosing game to play - program to load
+}
 
 int main(int argc, char* argv[])
 {
